@@ -83,6 +83,14 @@ options:
         default: no
         choices: ["yes", "no"]
         version_added: "2.0"
+
+    as_deps:
+        description:
+            - Whether or not to install the package with the **--asdeps** flag. 
+              Useful for installing optional dependencies.
+        required: false
+        default: "no"
+        choices: ["yes", "no"]
 '''
 
 EXAMPLES = '''
@@ -109,6 +117,9 @@ EXAMPLES = '''
 
 # Run the equivalent of "pacman -Rdd", force remove package baz
 - pacman: name=baz state=absent force=yes
+
+# Install package bar as dependency
+- pacman: name=bar state=present as_deps=yes
 '''
 
 import shlex
@@ -229,10 +240,15 @@ def install_packages(module, pacman_path, state, packages, package_files):
         if installed and (state == 'present' or (state == 'latest' and updated)):
             continue
 
+        flags = ""
+
+        if module.params["as_deps"]:
+            flags = '%s --asdeps' % flags
+
         if package_files[i]:
-            params = '-U %s' % package_files[i]
+            params = '-U%s %s' % (flags, package_files[i])
         else:
-            params = '-S %s' % package
+            params = '-S%s %s' % (flags, package)
 
         cmd = "%s %s --noconfirm" % (pacman_path, params)
         rc, stdout, stderr = module.run_command(cmd, check_rc=False)
@@ -275,8 +291,8 @@ def main():
             recurse      = dict(default=False, type='bool'),
             force        = dict(default=False, type='bool'),
             upgrade      = dict(default=False, type='bool'),
-            update_cache = dict(default=False, aliases=['update-cache'], type='bool')
-        ),
+            update_cache = dict(default=False, aliases=['update-cache'], type='bool'),
+            as_deps      = dict(default='no', type='bool')),
         required_one_of = [['name', 'update_cache', 'upgrade']],
         supports_check_mode = True)
 
