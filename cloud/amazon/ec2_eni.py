@@ -391,6 +391,12 @@ def modify_eni(connection, vpc_id, module, eni):
                 connection.unassign_private_ip_addresses(network_interface_id=eni.id, private_ip_addresses=current_secondary_addresses[:secondary_addresses_to_remove_count], dry_run=False)
 
         if attached == True and instance_id is not None:
+            if eni.attachment is None:
+                eni.attach(instance_id, device_index)
+                wait_for_eni(eni, "attached")
+                changed = True
+            elif eni.attachment.instance_id != instance_id:
+                detach_eni(eni, module)
                 eni.attach(instance_id, device_index)
                 wait_for_eni(eni, "attached")
                 changed = True
@@ -451,6 +457,8 @@ def find_eni(connection, module):
     eni_id = module.params.get("eni_id")
     subnet_id = module.params.get('subnet_id')
     private_ip_address = module.params.get('private_ip_address')
+    instance_id = module.params.get('instance_id')
+    device_index = module.params.get('device_index')
 
     try:
         filters = {}
@@ -458,6 +466,10 @@ def find_eni(connection, module):
             filters['private-ip-address'] = private_ip_address
         if subnet_id:
             filters['subnet-id'] = subnet_id
+        if instance_id:
+            filters['attachment.instance-id'] = instance_id
+        if device_index:
+            filters['attachment.device-index'] = device_index
 
         eni_result = connection.get_all_network_interfaces(eni_id, filters=filters)
         if len(eni_result) > 0:
